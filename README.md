@@ -1,144 +1,256 @@
-# 智能评估分析平台
+# DataViz Pro - Data Visualization Expert
 
-一个基于 Streamlit 构建的现代化评估数据分析与可视化平台，提供多维度、多方案的数据分析和对比功能。
+## Project Overview
+DataViz Pro is a professional data visualization analysis platform focused on data feature analysis, multi-dimensional visualization, and solution comparison. Through its intelligent data processing engine and rich visualization components, it helps users quickly gain insights into data features, discover data patterns, perform deep analysis, and optimize solutions.
 
-## 特性
+### Core Advantages
+- **Intelligent Feature Analysis**: Automatic feature recognition with professional analysis recommendations
+- **Multi-dimensional Visualization**: Support for various chart types to meet different analysis scenarios
+- **Deep Data Insights**: Uncover potential data value through advanced analysis algorithms
+- **Flexible Solution Comparison**: Support for parallel solution comparison to aid decision optimization
+- **Interactive Experience**: Intuitive interface with smooth interaction
 
-### 1. 数据配置与管理 (📊)
-- Excel 文件上传与管理
-- 文件预览与基本信息展示
-- 数据格式验证与错误提示
+## Features
 
-### 2. 评估结果详情 (📈)
-- 评估总分与关键指标展示
-- 详细指标得分与状态分析
-- 可视化图表展示（饼图、柱状图等）
+### Data Configuration & Management
+- **Smart Data Import**
+  - Support for multiple data formats (Excel, CSV, JSON, Parquet)
+  - Automatic data format recognition
+  - Intelligent encoding detection
+  - Data preview and validation
 
-### 3. 历史方案查阅 (🗂️)
-- 方案列表与概览
-- 方案详情查看
-- 历史数据追踪
+- **Feature Engineering**
+  - Automatic feature recognition and classification
+  - Feature importance analysis
+  - Feature correlation analysis
+  - Feature distribution analysis
 
-### 4. 方案对比分析 (⚖️)
-- 多方案并行对比
-- 指标差异分析
-- 对比可视化（雷达图、柱状图等）
+- **Data Cleaning**
+  - Intelligent missing value handling
+  - Outlier detection and processing
+  - Data format standardization
+  - Duplicate data cleaning
 
-### 5. 高级数据可视化 (🎨)
-- 多种图表类型支持
-- 自定义指标选择
-- 单文件/多文件分析模式
+### Analysis Results Display
+- **Multi-dimensional Visualization**
+  - Basic statistical charts
+  - Advanced analysis charts
+  - Interactive charts
+  - Custom charts
 
-## 项目结构
+- **Deep Analysis**
+  - Trend analysis
+  - Correlation analysis
+  - Distribution analysis
+  - Predictive analysis
 
+### Historical Data Analysis
+- **Time Series Analysis**
+  - Trend decomposition
+  - Seasonal analysis
+  - Cyclical analysis
+  - Predictive analysis
+
+- **Comparative Analysis**
+  - Time dimension comparison
+  - Feature dimension comparison
+  - Solution effectiveness comparison
+  - Optimization suggestions
+
+### Solution Comparison
+- **Multi-solution Parallel**
+  - Solution feature comparison
+  - Effectiveness difference analysis
+  - Optimization space assessment
+  - Decision recommendations
+
+- **Visualization Comparison**
+  - Multi-dimensional comparison charts
+  - Difference heatmaps
+  - Radar chart comparison
+  - Trend comparison
+
+### Deep Visualization
+- **Dimensionality Reduction**
+  - PCA principal component analysis
+  - t-SNE dimensionality reduction
+  - UMAP manifold learning
+  - Cluster visualization
+
+- **Network Analysis**
+  - Correlation networks
+  - Hierarchical structure analysis
+  - Dynamic network analysis
+  - Community detection
+
+## Technical Architecture
+
+### Technology Stack
 ```
-assessment_dashboard/
-├── app.py                    # 主应用入口
-├── pages/                    # 子页面模块
-│   ├── 1_📊_Data_Configuration.py
-│   ├── 2_📈_Evaluation_Results.py
-│   ├── 3_🗂️_Historical_Analysis.py
-│   ├── 4_⚖️_Scheme_Comparison.py
-│   └── 5_🎨_Advanced_Visualization.py
-├── data/
-│   └── uploaded_excel/       # 上传文件存储目录
-├── assets/
-│   └── custom_style.css      # 自定义样式
-├── .streamlit/
-│   └── config.toml          # Streamlit 配置
-└── requirements.txt         # 项目依赖
+Frontend Framework:
+- Streamlit >= 1.32.0
+- Plotly >= 5.18.0
+- Graphviz >= 0.20.0
+
+Data Processing:
+- Pandas >= 2.2.0
+- NumPy >= 1.26.0
+- Scikit-learn >= 1.5.0
+
+Development Tools:
+- Python >= 3.8
+- Git
+- Docker (optional)
 ```
 
-## 技术栈
+### Project Structure
+```
+project_root/
+├── app.py                 # Main application entry
+├── pages/                 # Page modules
+│   ├── 1_📊_Data_Configuration.py    # Data configuration page
+│   ├── 2_📈_Analysis_Results.py      # Analysis results page
+│   ├── 3_🗂️_Historical_Analysis.py   # Historical analysis page
+│   ├── 4_⚖️_Comparison_Analysis.py   # Comparison analysis page
+│   └── 5_🎨_Advanced_Visualization.py # Deep visualization page
+├── data/                  # Data directory
+│   ├── uploaded_files/    # Uploaded data files
+│   ├── processed_files/   # Processed data files
+│   └── config/           # Configuration files
+│       ├── features/     # Feature configuration
+│       └── rules/        # Processing rules
+├── utils/                # Utility functions
+│   ├── data_processor.py # Data processing tools
+│   ├── visualizer.py     # Visualization tools
+│   ├── validator.py      # Data validation tools
+│   └── cache_manager.py  # Cache management tools
+├── assets/              # Static resources
+│   ├── css/            # Style files
+│   │   └── custom_style.css
+│   ├── images/         # Image resources
+│   └── icons/          # Icon resources
+├── tests/              # Test directory
+│   ├── unit/          # Unit tests
+│   ├── integration/   # Integration tests
+│   └── performance/   # Performance tests
+└── .streamlit/        # Streamlit configuration
+    └── config.toml    # Theme and server configuration
+```
 
-- Streamlit >= 1.20.0
-- Pandas >= 1.5.0
-- Plotly >= 5.10.0
-- Openpyxl >= 3.0.0
-- NumPy >= 1.21.0
+## Installation
 
-## 安装与运行
-
-### 环境要求
-- Python 3.8+
-- pip 包管理器
-
-### 安装步骤
-
-1. 创建虚拟环境（推荐）：
+1. Create virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# 或
+# or
 venv\Scripts\activate  # Windows
 ```
 
-2. 安装依赖：
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. 运行应用：
+3. Run the application:
 ```bash
 streamlit run app.py
 ```
 
-## 数据格式说明
+## User Guide
 
-### Excel 文件要求
-- 支持 .xlsx 和 .xls 格式
-- 必须包含以下列：
-  - `指标名称` (TEXT): 评估指标描述
-  - `指标值` (NUMBER/TEXT): 指标当前值
-  - `权重` (NUMBER, 0-1): 指标权重
-  - `评分标准_及格线` (NUMBER): 及格阈值
-  - `评分标准_优秀线` (NUMBER): 优秀阈值
-  - `单位` (TEXT, 可选): 指标单位
+### Data Import
+1. Prepare data files (supports Excel, CSV, JSON, Parquet formats)
+2. Click "Upload File" on the data configuration page
+3. Wait for system to automatically analyze data features
+4. View data preview and feature analysis results
 
-### 程序计算列
-- `得分` (NUMBER): 根据指标值和评分标准计算
-- `状态` (TEXT): 根据得分判断（优秀/良好/及格/未达标）
+### Data Analysis
+1. Select the dataset to analyze
+2. Choose analysis dimensions and methods
+3. View analysis results and visualization charts
+4. Export analysis reports
 
-## 使用指南
+### Solution Comparison
+1. Select solutions to compare
+2. Set comparison dimensions and metrics
+3. View comparison results and difference analysis
+4. Get optimization suggestions
 
-### 1. 数据上传
-1. 进入"数据配置与管理"页面
-2. 点击上传按钮选择 Excel 文件
-3. 等待上传完成，查看文件预览
+## Configuration
 
-### 2. 评估分析
-1. 在"评估结果详情"页面选择要分析的文件
-2. 查看评估总分和关键指标
-3. 浏览详细评估结果和可视化图表
+### Data Configuration
+```json
+{
+  "data_config": {
+    "file_types": ["xlsx", "csv", "json", "parquet"],
+    "max_size_mb": 100,
+    "encoding": "utf-8",
+    "date_formats": ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y"],
+    "numeric_precision": 2,
+    "categorical_threshold": 0.1
+  }
+}
+```
 
-### 3. 方案对比
-1. 进入"方案对比分析"页面
-2. 选择要对比的两个方案
-3. 查看对比结果和可视化图表
+### Visualization Configuration
+```json
+{
+  "theme_config": {
+    "primary_color": "#1E88E5",
+    "secondary_color": "#42A5F5",
+    "background_color": "#121212",
+    "text_color": "#FFFFFF",
+    "font_family": "Roboto",
+    "font_size": 14
+  }
+}
+```
 
-### 4. 高级可视化
-1. 进入"高级数据可视化"页面
-2. 选择分析模式（单文件/多文件）
-3. 选择可视化类型和要展示的指标
-4. 查看生成的可视化图表
+## Project Screenshots
 
-## UI 风格说明
+### Data Configuration Page
+![Data Configuration Page](assets/screenshots/data_config.png)
+- File upload and management
+- Data feature analysis
+- Dynamic column mapping
+- Data preview
 
-平台采用现代化科技感深蓝色主题：
-- 主背景色: #0A192F
-- 内容背景色: #172A45
-- 文字颜色: #CCD6F6
-- 强调色: #64FFDA
+### Analysis Results Page
+![Analysis Results Page](assets/screenshots/evaluation_results.png)
+- Multi-dimensional data visualization
+- Dynamic data feature extraction
+- Correlation analysis
+- Trend analysis
 
-通过 `custom_style.css` 和 `config.toml` 实现统一的视觉风格。
+### Historical Analysis Page
+![Historical Analysis Page](assets/screenshots/historical_analysis.png)
+- Time series analysis
+- Comparative analysis
+- Pattern recognition
 
-## 更新日志
+### Solution Comparison Page
+![Solution Comparison Page](assets/screenshots/scheme_comparison.png)
+- Dynamic data feature comparison
+- Multi-dimensional visualization
+- Correlation difference analysis
 
-### v0.1.0 (2024-03-21)
-- 项目初始化，搭建多页面应用骨架
-- 实现数据上传与管理功能
-- 实现评估结果展示页面核心逻辑和UI
-- 添加科技感深蓝主题基础CSS和Streamlit配置
-- 实现历史方案查阅功能
-- 实现方案对比分析功能
-- 实现高级数据可视化功能 
+### Deep Visualization Page
+![Deep Visualization Page](assets/screenshots/advanced_visualization.png)
+- PCA dimensionality reduction
+- Correlation networks
+- Scatter matrix
+- Parallel coordinates
+
+## Changelog
+For detailed changelog, please see [CHANGELOG.md](CHANGELOG.md)
+
+## Contributing
+We welcome issues and pull requests to help improve the project. Before submitting code, please ensure:
+1. Code follows project coding standards
+2. Necessary test cases are added
+3. Related documentation is updated
+4. All tests pass
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

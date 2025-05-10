@@ -1,0 +1,186 @@
+{
+  "numeric_columns": [
+    "Year",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+  ],
+  "categorical_columns": [
+    "Account",
+    "business_unit",
+    "Currency",
+    "Scenario"
+  ],
+  "date_columns": [],
+  "text_columns": [],
+  "column_stats": {
+    "Account": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "unique_values": 9,
+      "most_common": {
+        "Sales": 39,
+        "Cost of Goods Sold": 39,
+        "Commissions Expense": 39
+      }
+    },
+    "business_unit": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "unique_values": 3,
+      "most_common": {
+        "Software": 117,
+        "Advertising": 117,
+        "Hardware": 117
+      }
+    },
+    "Currency": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "unique_values": 1,
+      "most_common": {
+        "USD": 351
+      }
+    },
+    "Year": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": 1914.412154388693,
+      "max": 2120.039883106072,
+      "mean": 2015.8676162877748,
+      "std": 59.0018521957582
+    },
+    "Scenario": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "unique_values": 3,
+      "most_common": {
+        "Actuals": 297,
+        "Budget": 27,
+        "Forecast": 27
+      }
+    },
+    "Jan": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -44864311.74681135,
+      "max": 55243597.0459509,
+      "mean": 64152.90455499522,
+      "std": 14635846.093496425
+    },
+    "Feb": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -38985029.86295515,
+      "max": 50315248.24018712,
+      "mean": 23197.985530887865,
+      "std": 13408434.103664208
+    },
+    "Mar": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -47321486.42353601,
+      "max": 56058368.92599215,
+      "mean": 23548.544319857083,
+      "std": 14866316.259843243
+    },
+    "Apr": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -42125838.19999392,
+      "max": 52140546.89698463,
+      "mean": 60468.35150047362,
+      "std": 13926003.420921749
+    },
+    "May": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -43006015.9003645,
+      "max": 53503703.62296619,
+      "mean": -28348.432030473,
+      "std": 14326267.333680762
+    },
+    "Jun": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -47002018.49011064,
+      "max": 54771246.84555113,
+      "mean": -3073.7618838628896,
+      "std": 14617907.179772573
+    },
+    "Jul": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -49670228.05590126,
+      "max": 57126157.09944557,
+      "mean": -5961.677629152137,
+      "std": 15181268.130538879
+    },
+    "Aug": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -48949229.47097565,
+      "max": 56539156.29672495,
+      "mean": 63151.00445636765,
+      "std": 15164515.170581391
+    },
+    "Sep": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -46022373.11962657,
+      "max": 56411694.55675881,
+      "mean": 64798.44177406525,
+      "std": 15017649.921711052
+    },
+    "Oct": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -43034463.81080268,
+      "max": 52247026.40089604,
+      "mean": 31027.77727013266,
+      "std": 13913677.81658724
+    },
+    "Nov": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -45428387.94152453,
+      "max": 53971407.64423481,
+      "mean": 20556.835395739352,
+      "std": 14394602.512152256
+    },
+    "Dec": {
+      "non_null_count": "351",
+      "null_count": "0",
+      "null_percentage": 0.0,
+      "min": -44123631.89613301,
+      "max": 56205155.09794212,
+      "mean": 50271.075538559264,
+      "std": 14912233.854251683
+    }
+  }
+}

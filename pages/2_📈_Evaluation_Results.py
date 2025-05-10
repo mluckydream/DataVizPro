@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
+import json
 import numpy as np
+import graphviz
 
 # Page config
 st.set_page_config(
@@ -14,173 +17,263 @@ st.set_page_config(
 # Title
 st.title("📈 评估结果详情")
 
-# Helper functions
-def calculate_score(value, weight, pass_threshold, excellent_threshold):
-    """Calculate score based on value and thresholds"""
-    if pd.isna(value) or pd.isna(pass_threshold) or pd.isna(excellent_threshold):
-        return None
-    
-    try:
-        value = float(value)
-        if value >= excellent_threshold:
-            return 100
-        elif value >= pass_threshold:
-            return 60 + (value - pass_threshold) * 40 / (excellent_threshold - pass_threshold)
-        else:
-            return 60 * value / pass_threshold
-    except:
-        return None
+# Load data features
+FEATURES_DIR = Path(__file__).parent.parent / "data" / "features"
+UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_excel"
 
-def get_status(score):
-    """Get status based on score"""
-    if pd.isna(score):
-        return "未知"
-    elif score >= 90:
-        return "优秀"
-    elif score >= 75:
-        return "良好"
-    elif score >= 60:
-        return "及格"
-    else:
-        return "未达标"
+def load_data_features(file_name):
+    """Load data features from JSON file"""
+    features_file = FEATURES_DIR / f"{file_name}.json"
+    if features_file.exists():
+        with open(features_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
+
+def create_mermaid_chart(df, features):
+    """Create a Mermaid flowchart for data relationships"""
+    mermaid_code = "graph TD\n"
+    
+    # Add nodes for numeric columns
+    for col in features["numeric_columns"]:
+        stats = features["column_stats"][col]
+        mermaid_code += f"    {col}[{col}<br/>均值: {stats['mean']:.2f}<br/>标准差: {stats['std']:.2f}]\n"
+    
+    # Add nodes for categorical columns
+    for col in features["categorical_columns"]:
+        stats = features["column_stats"][col]
+        mermaid_code += f"    {col}[{col}<br/>唯一值: {stats['unique_values']}]\n"
+    
+    # Add relationships based on correlations
+    if len(features["numeric_columns"]) > 1:
+        numeric_df = df[features["numeric_columns"]]
+        corr_matrix = numeric_df.corr()
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                if abs(corr_matrix.iloc[i,j]) > 0.3:
+                    mermaid_code += f"    {corr_matrix.columns[i]} --> {corr_matrix.columns[j]}\n"
+    
+    return mermaid_code
+
+def analyze_data(df, features):
+    """Analyze data and return analysis results"""
+    analysis = {
+        "numeric_analysis": {},
+        "categorical_analysis": {},
+        "correlations": {},
+        "trends": {},
+        "visualizations": {}
+    }
+    
+    # Analyze numeric columns
+    for col in features["numeric_columns"]:
+        stats = features["column_stats"][col]
+        analysis["numeric_analysis"][col] = {
+            "summary": {
+                "min": stats["min"],
+                "max": stats["max"],
+                "mean": stats["mean"],
+                "std": stats["std"]
+            },
+            "distribution": df[col].value_counts().sort_index().to_dict()
+        }
+        
+        # Create bar chart
+        fig_bar = px.bar(
+            df,
+            x=df.index,
+            y=col,
+            title=f"{col}柱状图"
+        )
+        analysis["visualizations"][f"{col}_bar"] = fig_bar
+        
+        # Create line chart
+        fig_line = px.line(
+            df,
+            x=df.index,
+            y=col,
+            title=f"{col}趋势图"
+        )
+        analysis["visualizations"][f"{col}_line"] = fig_line
+    
+    # Analyze categorical columns
+    for col in features["categorical_columns"]:
+        stats = features["column_stats"][col]
+        analysis["categorical_analysis"][col] = {
+            "unique_values": stats["unique_values"],
+            "most_common": stats["most_common"],
+            "distribution": df[col].value_counts().to_dict()
+        }
+        
+        # Create pie chart
+        fig_pie = px.pie(
+            df,
+            names=col,
+            title=f"{col}分布"
+        )
+        analysis["visualizations"][f"{col}_pie"] = fig_pie
+    
+    # Calculate correlations between numeric columns
+    if len(features["numeric_columns"]) > 1:
+        numeric_df = df[features["numeric_columns"]]
+        corr_matrix = numeric_df.corr()
+        analysis["correlations"] = corr_matrix.to_dict()
+        
+        # Create correlation heatmap
+        fig_heatmap = px.imshow(
+            corr_matrix,
+            title="相关性热力图",
+            color_continuous_scale="RdBu"
+        )
+        analysis["visualizations"]["correlation_heatmap"] = fig_heatmap
+        
+        # Create radar chart for top correlated features
+        top_correlations = []
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                if abs(corr_matrix.iloc[i,j]) > 0.3:
+                    top_correlations.append((
+                        corr_matrix.columns[i],
+                        corr_matrix.columns[j],
+                        corr_matrix.iloc[i,j]
+                    ))
+        
+        if top_correlations:
+            fig_radar = go.Figure()
+            for col1, col2, corr in top_correlations:
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=[df[col1].mean(), df[col2].mean()],
+                    theta=[col1, col2],
+                    fill='toself',
+                    name=f"{col1}-{col2}"
+                ))
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, max(df[col].mean() for col in features["numeric_columns"]) * 1.2]
+                    )
+                ),
+                title="相关性雷达图"
+            )
+            analysis["visualizations"]["correlation_radar"] = fig_radar
+    
+    # Analyze trends if there are date columns
+    if features["date_columns"]:
+        for date_col in features["date_columns"]:
+            for num_col in features["numeric_columns"]:
+                trend = df.groupby(date_col)[num_col].mean()
+                analysis["trends"][f"{date_col}_{num_col}"] = trend.to_dict()
+                
+                # Create trend line chart
+                fig_trend = px.line(
+                    x=trend.index,
+                    y=trend.values,
+                    title=f"{num_col}随时间变化趋势"
+                )
+                analysis["visualizations"][f"{date_col}_{num_col}_trend"] = fig_trend
+    
+    return analysis
 
 # File selection
-UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_excel"
+st.header("选择评估方案")
 existing_files = list(UPLOAD_DIR.glob("*.xlsx")) + list(UPLOAD_DIR.glob("*.xls"))
 
 if not existing_files:
-    st.warning("请先在数据配置页面上传评估数据文件")
+    st.info("请先在数据配置页面上传文件")
 else:
     selected_file = st.selectbox(
-        "选择评估方案",
-        [f.name for f in existing_files],
-        key="eval_file"
+        "选择要分析的文件",
+        [f.name for f in existing_files]
     )
     
     if selected_file:
         try:
-            # Load data
+            # Load the Excel file
             file_path = UPLOAD_DIR / selected_file
-            df = pd.read_excel(file_path)
+            excel_file = pd.ExcelFile(file_path)
+            sheet_names = excel_file.sheet_names
             
-            # Calculate scores and status
-            df['得分'] = df.apply(
-                lambda row: calculate_score(
-                    row['指标值'],
-                    row['权重'],
-                    row['评分标准_及格线'],
-                    row['评分标准_优秀线']
-                ),
-                axis=1
-            )
-            
-            df['状态'] = df['得分'].apply(get_status)
-            
-            # Calculate weighted total score
-            total_score = np.average(
-                df['得分'].dropna(),
-                weights=df.loc[df['得分'].notna(), '权重']
-            )
-            
-            # Summary metrics
-            st.header("评估摘要")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("总分", f"{total_score:.1f}")
-            with col2:
-                st.metric(
-                    "未达标指标",
-                    len(df[df['状态'] == "未达标"]),
-                    delta=None
+            # Sheet selection
+            if len(sheet_names) > 1:
+                selected_sheet = st.selectbox(
+                    "选择工作表",
+                    sheet_names
                 )
-            with col3:
-                st.metric(
-                    "达标指标",
-                    len(df[df['状态'].isin(["及格", "良好"])]),
-                    delta=None
-                )
-            with col4:
-                st.metric(
-                    "优势指标",
-                    len(df[df['状态'] == "优秀"]),
-                    delta=None
-                )
+                df = pd.read_excel(file_path, sheet_name=selected_sheet)
+            else:
+                df = pd.read_excel(file_path)
             
-            # Detailed results
-            st.header("详细评估结果")
-            
-            # Format the display dataframe
-            display_df = df.copy()
-            display_df['状态与得分'] = display_df.apply(
-                lambda row: f"{row['状态']} ({row['得分']:.1f})" if pd.notna(row['得分']) else "未知",
-                axis=1
-            )
-            display_df['评分标准'] = display_df.apply(
-                lambda row: f"{row['评分标准_及格线']} / {row['评分标准_优秀线']}",
-                axis=1
-            )
-            
-            # Select columns to display
-            display_columns = [
-                '指标名称',
-                '指标值',
-                '状态与得分',
-                '权重',
-                '评分标准',
-                '单位'
-            ]
-            
-            # Display the dataframe
-            st.dataframe(
-                display_df[display_columns],
-                use_container_width=True
-            )
-            
-            # Visualization
-            st.header("评估结果可视化")
-            
-            # Status distribution pie chart
-            status_counts = df['状态'].value_counts()
-            fig_pie = px.pie(
-                values=status_counts.values,
-                names=status_counts.index,
-                title="指标状态分布",
-                color=status_counts.index,
-                color_discrete_map={
-                    "优秀": "#00FF00",
-                    "良好": "#90EE90",
-                    "及格": "#FFD700",
-                    "未达标": "#FF0000",
-                    "未知": "#808080"
-                }
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-            
-            # Score distribution histogram
-            fig_hist = px.histogram(
-                df,
-                x='得分',
-                title="得分分布",
-                nbins=20,
-                color_discrete_sequence=['#00A0FF']
-            )
-            st.plotly_chart(fig_hist, use_container_width=True)
-            
-            # Top and bottom indicators
-            st.subheader("关键指标分析")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("表现最好的指标")
-                top_indicators = df.nlargest(3, '得分')[['指标名称', '指标值', '得分', '状态']]
-                st.dataframe(top_indicators, use_container_width=True)
-            
-            with col2:
-                st.write("需要改进的指标")
-                bottom_indicators = df.nsmallest(3, '得分')[['指标名称', '指标值', '得分', '状态']]
-                st.dataframe(bottom_indicators, use_container_width=True)
-            
+            # Load and analyze data features
+            features = load_data_features(selected_file)
+            if features:
+                analysis = analyze_data(df, features)
+                
+                # Display analysis results
+                st.header("数据分析结果")
+                
+                # Create tabs for different visualization types
+                tab1, tab2, tab3, tab4 = st.tabs(["基础分析", "柱状图", "雷达图", "趋势图"])
+                
+                with tab1:
+                    # Numeric columns analysis
+                    if analysis["numeric_analysis"]:
+                        st.subheader("数值型指标分析")
+                        for col, data in analysis["numeric_analysis"].items():
+                            st.write(f"### {col}")
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("最小值", f"{data['summary']['min']:.2f}")
+                            with col2:
+                                st.metric("最大值", f"{data['summary']['max']:.2f}")
+                            with col3:
+                                st.metric("平均值", f"{data['summary']['mean']:.2f}")
+                            with col4:
+                                st.metric("标准差", f"{data['summary']['std']:.2f}")
+                    
+                    # Categorical columns analysis
+                    if analysis["categorical_analysis"]:
+                        st.subheader("类别型指标分析")
+                        for col, data in analysis["categorical_analysis"].items():
+                            st.write(f"### {col}")
+                            st.write(f"唯一值数量: {data['unique_values']}")
+                            st.write("最常见值:")
+                            for value, count in data["most_common"].items():
+                                st.write(f"- {value}: {count}次")
+                    
+                    # Display Mermaid chart
+                    st.subheader("数据关系图")
+                    mermaid_code = create_mermaid_chart(df, features)
+                    st.graphviz_chart(mermaid_code)
+                
+                with tab2:
+                    # Display bar charts
+                    if analysis["visualizations"]:
+                        st.subheader("柱状图分析")
+                        for viz_name, fig in analysis["visualizations"].items():
+                            if viz_name.endswith("_bar"):
+                                st.plotly_chart(fig, use_container_width=True)
+                
+                with tab3:
+                    # Display radar charts
+                    if "correlation_radar" in analysis["visualizations"]:
+                        st.subheader("雷达图分析")
+                        st.plotly_chart(analysis["visualizations"]["correlation_radar"], use_container_width=True)
+                    
+                    # Display correlation heatmap
+                    if "correlation_heatmap" in analysis["visualizations"]:
+                        st.subheader("相关性热力图")
+                        st.plotly_chart(analysis["visualizations"]["correlation_heatmap"], use_container_width=True)
+                
+                with tab4:
+                    # Display trend charts
+                    if analysis["visualizations"]:
+                        st.subheader("趋势分析")
+                        for viz_name, fig in analysis["visualizations"].items():
+                            if viz_name.endswith("_trend"):
+                                st.plotly_chart(fig, use_container_width=True)
+                
+            else:
+                st.warning("未找到数据特征信息，请先在数据配置页面分析数据")
+                
         except Exception as e:
-            st.error(f"处理数据时出错: {str(e)}")
-            st.error("请确保数据文件包含所需的列：指标名称、指标值、权重、评分标准_及格线、评分标准_优秀线、单位") 
+            st.error(f"处理数据时出错: {str(e)}") 

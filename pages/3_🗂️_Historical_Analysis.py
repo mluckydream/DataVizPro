@@ -1,175 +1,263 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
+import json
 import numpy as np
 from datetime import datetime
 
 # Page config
 st.set_page_config(
-    page_title="历史方案查阅",
+    page_title="历史方案分析",
     page_icon="🗂️",
     layout="wide"
 )
 
 # Title
-st.title("🗂️ 历史方案查阅")
+st.title("🗂️ 历史方案分析")
 
-# Helper functions
-def load_scheme_data(file_path):
-    """Load and process scheme data"""
-    df = pd.read_excel(file_path)
-    df['得分'] = df.apply(
-        lambda row: calculate_score(
-            row['指标值'],
-            row['权重'],
-            row['评分标准_及格线'],
-            row['评分标准_优秀线']
-        ),
-        axis=1
-    )
-    df['状态'] = df['得分'].apply(get_status)
-    return df
+# Load data features
+def load_data_features(file_name):
+    """Load data features from JSON file"""
+    features_file = Path(__file__).parent.parent / "data" / "features" / f"{file_name}.json"
+    if features_file.exists():
+        with open(features_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
 
-def calculate_score(value, weight, pass_threshold, excellent_threshold):
-    """Calculate score based on value and thresholds"""
-    if pd.isna(value) or pd.isna(pass_threshold) or pd.isna(excellent_threshold):
-        return None
-    
+def load_excel_file(file_path):
+    """Load Excel file with proper data type conversion"""
     try:
-        value = float(value)
-        if value >= excellent_threshold:
-            return 100
-        elif value >= pass_threshold:
-            return 60 + (value - pass_threshold) * 40 / (excellent_threshold - pass_threshold)
-        else:
-            return 60 * value / pass_threshold
-    except:
+        df = pd.read_excel(file_path)
+        return df
+    except Exception as e:
+        st.error(f"加载文件时出错: {str(e)}")
         return None
 
-def get_status(score):
-    """Get status based on score"""
-    if pd.isna(score):
-        return "未知"
-    elif score >= 90:
-        return "优秀"
-    elif score >= 75:
-        return "良好"
-    elif score >= 60:
-        return "及格"
-    else:
-        return "未达标"
-
-# Get list of files
+# Get uploaded files
 UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_excel"
 existing_files = list(UPLOAD_DIR.glob("*.xlsx")) + list(UPLOAD_DIR.glob("*.xls"))
 
 if not existing_files:
-    st.warning("请先在数据配置页面上传评估数据文件")
+    st.warning("请先在数据配置页面上传文件")
 else:
-    # Create a summary of all schemes
-    schemes_summary = []
+    # File selection
+    selected_files = st.multiselect(
+        "选择要分析的文件",
+        [f.name for f in existing_files],
+        default=[f.name for f in existing_files[:2]] if len(existing_files) >= 2 else [f.name for f in existing_files]
+    )
     
-    for file in existing_files:
-        try:
-            df = load_scheme_data(file)
-            total_score = np.average(
-                df['得分'].dropna(),
-                weights=df.loc[df['得分'].notna(), '权重']
-            )
-            
-            schemes_summary.append({
-                "方案名称": file.stem,
-                "上传时间": datetime.fromtimestamp(file.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                "总分": total_score,
-                "指标总数": len(df),
-                "优秀指标数": len(df[df['状态'] == "优秀"]),
-                "良好指标数": len(df[df['状态'] == "良好"]),
-                "及格指标数": len(df[df['状态'] == "及格"]),
-                "未达标指标数": len(df[df['状态'] == "未达标"])
-            })
-        except Exception as e:
-            st.error(f"处理文件 {file.name} 时出错: {str(e)}")
-    
-    if schemes_summary:
-        # Convert to DataFrame
-        summary_df = pd.DataFrame(schemes_summary)
-        
-        # Display summary table
-        st.header("方案概览")
-        st.dataframe(summary_df, use_container_width=True)
-        
-        # Visualization
-        st.header("方案对比分析")
-        
-        # Score comparison
-        fig_scores = px.bar(
-            summary_df,
-            x="方案名称",
-            y="总分",
-            title="方案总分对比",
-            color="总分",
-            color_continuous_scale="Viridis"
-        )
-        st.plotly_chart(fig_scores, use_container_width=True)
-        
-        # Status distribution
-        status_cols = ["优秀指标数", "良好指标数", "及格指标数", "未达标指标数"]
-        fig_status = px.bar(
-            summary_df,
-            x="方案名称",
-            y=status_cols,
-            title="方案指标状态分布",
-            barmode="stack"
-        )
-        st.plotly_chart(fig_status, use_container_width=True)
-        
-        # Detailed view
-        st.header("方案详情")
-        selected_scheme = st.selectbox(
-            "选择要查看的方案",
-            summary_df["方案名称"].tolist(),
-            key="scheme_select"
-        )
-        
-        if selected_scheme:
-            try:
-                # Load selected scheme data
-                file_path = UPLOAD_DIR / f"{selected_scheme}.xlsx"
-                if not file_path.exists():
-                    file_path = UPLOAD_DIR / f"{selected_scheme}.xls"
-                
-                df = load_scheme_data(file_path)
-                
-                # Display metrics
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("总分", f"{summary_df[summary_df['方案名称'] == selected_scheme]['总分'].iloc[0]:.1f}")
-                with col2:
-                    st.metric("指标总数", summary_df[summary_df['方案名称'] == selected_scheme]['指标总数'].iloc[0])
-                with col3:
-                    st.metric("优秀指标", summary_df[summary_df['方案名称'] == selected_scheme]['优秀指标数'].iloc[0])
-                with col4:
-                    st.metric("未达标指标", summary_df[summary_df['方案名称'] == selected_scheme]['未达标指标数'].iloc[0])
-                
-                # Display detailed data
-                st.subheader("指标详情")
-                display_df = df.copy()
-                display_df['状态与得分'] = display_df.apply(
-                    lambda row: f"{row['状态']} ({row['得分']:.1f})" if pd.notna(row['得分']) else "未知",
-                    axis=1
-                )
-                display_df['评分标准'] = display_df.apply(
-                    lambda row: f"{row['评分标准_及格线']} / {row['评分标准_优秀线']}",
-                    axis=1
-                )
-                
-                st.dataframe(
-                    display_df[['指标名称', '指标值', '状态与得分', '权重', '评分标准', '单位']],
-                    use_container_width=True
-                )
-                
-            except Exception as e:
-                st.error(f"加载方案详情时出错: {str(e)}")
+    if len(selected_files) < 2:
+        st.warning("请至少选择两个文件进行分析")
     else:
-        st.error("无法加载任何方案数据，请检查文件格式是否正确") 
+        # Load and process selected files
+        dfs = {}
+        features = {}
+        
+        for file_name in selected_files:
+            file_path = UPLOAD_DIR / file_name
+            df = load_excel_file(file_path)
+            if df is not None:
+                dfs[file_name] = df
+                features[file_name] = load_data_features(file_name)
+        
+        if len(dfs) >= 2:
+            # Create tabs for different analysis types
+            tab1, tab2, tab3 = st.tabs(["时间序列分析", "对比分析", "趋势模式分析"])
+            
+            with tab1:
+                st.header("时间序列分析")
+                
+                # Get common numeric columns across all files
+                common_numeric_cols = set.intersection(
+                    *[set(features[f]["numeric_columns"]) for f in features if features[f]]
+                )
+                
+                if common_numeric_cols:
+                    selected_col = st.selectbox(
+                        "选择要分析的指标",
+                        list(common_numeric_cols)
+                    )
+                    
+                    # Create time series plot
+                    fig = go.Figure()
+                    
+                    for file_name, df in dfs.items():
+                        if selected_col in df.columns:
+                            fig.add_trace(go.Scatter(
+                                x=df.index,
+                                y=df[selected_col],
+                                name=file_name,
+                                mode='lines+markers'
+                            ))
+                    
+                    fig.update_layout(
+                        title=f"{selected_col} 时间序列分析",
+                        xaxis_title="时间",
+                        yaxis_title=selected_col,
+                        showlegend=True
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Calculate and display statistics
+                    st.subheader("统计指标")
+                    stats_df = pd.DataFrame()
+                    
+                    for file_name, df in dfs.items():
+                        if selected_col in df.columns:
+                            stats = {
+                                "文件": file_name,
+                                "平均值": df[selected_col].mean(),
+                                "标准差": df[selected_col].std(),
+                                "最小值": df[selected_col].min(),
+                                "最大值": df[selected_col].max(),
+                                "中位数": df[selected_col].median()
+                            }
+                            stats_df = pd.concat([stats_df, pd.DataFrame([stats])], ignore_index=True)
+                    
+                    st.dataframe(stats_df, use_container_width=True)
+                else:
+                    st.warning("未找到共同的数值型列")
+            
+            with tab2:
+                st.header("对比分析")
+                
+                # Get common numeric columns
+                common_numeric_cols = set.intersection(
+                    *[set(features[f]["numeric_columns"]) for f in features if features[f]]
+                )
+                
+                if common_numeric_cols:
+                    selected_cols = st.multiselect(
+                        "选择要对比的指标",
+                        list(common_numeric_cols),
+                        default=list(common_numeric_cols)[:3] if len(common_numeric_cols) >= 3 else list(common_numeric_cols)
+                    )
+                    
+                    if selected_cols:
+                        # Create comparison plot
+                        fig = go.Figure()
+                        
+                        for file_name, df in dfs.items():
+                            for col in selected_cols:
+                                if col in df.columns:
+                                    fig.add_trace(go.Box(
+                                        y=df[col],
+                                        name=f"{file_name} - {col}",
+                                        boxpoints='all'
+                                    ))
+                        
+                        fig.update_layout(
+                            title="指标对比分析",
+                            yaxis_title="值",
+                            showlegend=True,
+                            boxmode='group'
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Calculate and display comparison statistics
+                        st.subheader("对比统计")
+                        comparison_stats = []
+                        
+                        for file_name, df in dfs.items():
+                            for col in selected_cols:
+                                if col in df.columns:
+                                    stats = {
+                                        "文件": file_name,
+                                        "指标": col,
+                                        "平均值": df[col].mean(),
+                                        "标准差": df[col].std(),
+                                        "最小值": df[col].min(),
+                                        "最大值": df[col].max(),
+                                        "中位数": df[col].median()
+                                    }
+                                    comparison_stats.append(stats)
+                        
+                        comparison_df = pd.DataFrame(comparison_stats)
+                        st.dataframe(comparison_df, use_container_width=True)
+                else:
+                    st.warning("未找到共同的数值型列")
+            
+            with tab3:
+                st.header("趋势模式分析")
+                
+                # Get common numeric columns
+                common_numeric_cols = set.intersection(
+                    *[set(features[f]["numeric_columns"]) for f in features if features[f]]
+                )
+                
+                if common_numeric_cols:
+                    selected_col = st.selectbox(
+                        "选择要分析的指标",
+                        list(common_numeric_cols),
+                        key="trend_col"
+                    )
+                    
+                    # Calculate rolling statistics
+                    window_size = st.slider("滚动窗口大小", 2, 10, 3)
+                    
+                    for file_name, df in dfs.items():
+                        if selected_col in df.columns:
+                            st.subheader(f"{file_name} - {selected_col} 趋势分析")
+                            
+                            # Calculate rolling statistics
+                            rolling_mean = df[selected_col].rolling(window=window_size).mean()
+                            rolling_std = df[selected_col].rolling(window=window_size).std()
+                            
+                            # Create trend plot
+                            fig = go.Figure()
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df.index,
+                                y=df[selected_col],
+                                name="原始数据",
+                                mode='lines+markers'
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df.index,
+                                y=rolling_mean,
+                                name="滚动平均",
+                                mode='lines'
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df.index,
+                                y=rolling_mean + rolling_std,
+                                name="上界",
+                                mode='lines',
+                                line=dict(dash='dash')
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df.index,
+                                y=rolling_mean - rolling_std,
+                                name="下界",
+                                mode='lines',
+                                line=dict(dash='dash')
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"{selected_col} 趋势分析",
+                                xaxis_title="时间",
+                                yaxis_title=selected_col,
+                                showlegend=True
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Calculate trend statistics
+                            trend_stats = {
+                                "趋势方向": "上升" if df[selected_col].iloc[-1] > df[selected_col].iloc[0] else "下降",
+                                "波动性": f"{df[selected_col].std():.2f}",
+                                "稳定性": f"{1 - (df[selected_col].std() / df[selected_col].mean()):.2f}" if df[selected_col].mean() != 0 else "N/A"
+                            }
+                            
+                            st.write("趋势统计")
+                            st.json(trend_stats)
+                else:
+                    st.warning("未找到共同的数值型列") 

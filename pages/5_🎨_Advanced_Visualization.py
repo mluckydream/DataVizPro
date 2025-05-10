@@ -3,299 +3,199 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
+import json
 import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 # Page config
 st.set_page_config(
-    page_title="高级数据可视化",
+    page_title="高级可视化分析",
     page_icon="🎨",
     layout="wide"
 )
 
 # Title
-st.title("🎨 高级数据可视化")
+st.title("🎨 高级可视化分析")
 
-# Helper functions
-def load_scheme_data(file_path):
-    """Load and process scheme data"""
-    df = pd.read_excel(file_path)
-    df['得分'] = df.apply(
-        lambda row: calculate_score(
-            row['指标值'],
-            row['权重'],
-            row['评分标准_及格线'],
-            row['评分标准_优秀线']
-        ),
-        axis=1
-    )
-    df['状态'] = df['得分'].apply(get_status)
-    return df
-
-def calculate_score(value, weight, pass_threshold, excellent_threshold):
-    """Calculate score based on value and thresholds"""
-    if pd.isna(value) or pd.isna(pass_threshold) or pd.isna(excellent_threshold):
-        return None
-    
-    try:
-        value = float(value)
-        if value >= excellent_threshold:
-            return 100
-        elif value >= pass_threshold:
-            return 60 + (value - pass_threshold) * 40 / (excellent_threshold - pass_threshold)
-        else:
-            return 60 * value / pass_threshold
-    except:
-        return None
-
-def get_status(score):
-    """Get status based on score"""
-    if pd.isna(score):
-        return "未知"
-    elif score >= 90:
-        return "优秀"
-    elif score >= 75:
-        return "良好"
-    elif score >= 60:
-        return "及格"
-    else:
-        return "未达标"
-
-# Get list of files
+# Load data features
+FEATURES_DIR = Path(__file__).parent.parent / "data" / "features"
 UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_excel"
+
+def load_data_features(file_name):
+    """Load data features from JSON file"""
+    features_file = FEATURES_DIR / f"{file_name}.json"
+    if features_file.exists():
+        with open(features_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
+
+def create_advanced_visualizations(df, features):
+    """Create advanced visualizations based on data features"""
+    visualizations = {}
+    
+    # PCA Analysis
+    if len(features["numeric_columns"]) > 1:
+        # Prepare data
+        numeric_data = df[features["numeric_columns"]].dropna()
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(numeric_data)
+        
+        # Perform PCA
+        pca = PCA(n_components=min(3, len(features["numeric_columns"])))
+        pca_result = pca.fit_transform(scaled_data)
+        
+        # Create 2D PCA plot
+        fig_2d = px.scatter(
+            x=pca_result[:, 0],
+            y=pca_result[:, 1],
+            title="PCA 2D 投影",
+            labels={'x': '主成分1', 'y': '主成分2'}
+        )
+        visualizations["pca_2d"] = fig_2d
+        
+        # Create 3D PCA plot if possible
+        if pca_result.shape[1] > 2:
+            fig_3d = px.scatter_3d(
+                x=pca_result[:, 0],
+                y=pca_result[:, 1],
+                z=pca_result[:, 2],
+                title="PCA 3D 投影",
+                labels={'x': '主成分1', 'y': '主成分2', 'z': '主成分3'}
+            )
+            visualizations["pca_3d"] = fig_3d
+        
+        # Create explained variance plot
+        explained_variance = pca.explained_variance_ratio_
+        fig_variance = go.Figure()
+        fig_variance.add_trace(go.Bar(
+            x=[f"PC{i+1}" for i in range(len(explained_variance))],
+            y=explained_variance,
+            text=[f"{v:.1%}" for v in explained_variance],
+            textposition="auto",
+        ))
+        fig_variance.update_layout(
+            title="主成分解释方差比例",
+            xaxis_title="主成分",
+            yaxis_title="解释方差比例"
+        )
+        visualizations["pca_variance"] = fig_variance
+    
+    # Correlation Network
+    if len(features["numeric_columns"]) > 1:
+        corr_matrix = df[features["numeric_columns"]].corr()
+        threshold = 0.5  # Only show correlations above threshold
+        
+        # Create network graph
+        fig_network = go.Figure()
+        
+        # Add edges
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                corr = corr_matrix.iloc[i, j]
+                if abs(corr) > threshold:
+                    fig_network.add_trace(go.Scatter(
+                        x=[i, j],
+                        y=[0, 0],
+                        mode='lines',
+                        line=dict(
+                            width=abs(corr) * 5,
+                            color='red' if corr < 0 else 'blue'
+                        ),
+                        hoverinfo='text',
+                        text=f"相关系数: {corr:.2f}"
+                    ))
+        
+        # Add nodes
+        fig_network.add_trace(go.Scatter(
+            x=list(range(len(corr_matrix.columns))),
+            y=[0] * len(corr_matrix.columns),
+            mode='markers+text',
+            marker=dict(size=20),
+            text=corr_matrix.columns,
+            textposition="top center"
+        ))
+        
+        fig_network.update_layout(
+            title="相关性网络图",
+            showlegend=False,
+            xaxis=dict(showticklabels=False),
+            yaxis=dict(showticklabels=False)
+        )
+        visualizations["correlation_network"] = fig_network
+    
+    # Scatter Matrix
+    if len(features["numeric_columns"]) > 1:
+        fig_matrix = px.scatter_matrix(
+            df,
+            dimensions=features["numeric_columns"][:5],  # Limit to 5 dimensions for clarity
+            title="散点矩阵图"
+        )
+        visualizations["scatter_matrix"] = fig_matrix
+    
+    # Parallel Coordinates
+    if len(features["numeric_columns"]) > 1:
+        fig_parallel = px.parallel_coordinates(
+            df,
+            dimensions=features["numeric_columns"][:5],  # Limit to 5 dimensions for clarity
+            title="平行坐标图"
+        )
+        visualizations["parallel_coordinates"] = fig_parallel
+    
+    return visualizations
+
+# File selection
+st.header("选择要分析的文件")
 existing_files = list(UPLOAD_DIR.glob("*.xlsx")) + list(UPLOAD_DIR.glob("*.xls"))
 
 if not existing_files:
-    st.warning("请先在数据配置页面上传评估数据文件")
+    st.info("请先在数据配置页面上传文件")
 else:
-    # Analysis mode selection
-    analysis_mode = st.radio(
-        "选择分析模式",
-        ["单文件分析", "多文件对比"],
-        horizontal=True
+    selected_file = st.selectbox(
+        "选择文件",
+        [f.name for f in existing_files]
     )
     
-    if analysis_mode == "单文件分析":
-        # Single file selection
-        selected_file = st.selectbox(
-            "选择要分析的文件",
-            [f.name for f in existing_files],
-            key="single_file"
-        )
-        
-        if selected_file:
-            try:
-                # Load data
-                df = load_scheme_data(UPLOAD_DIR / selected_file)
-                
-                # Visualization type selection
-                viz_type = st.selectbox(
-                    "选择可视化类型",
-                    ["表格", "雷达图", "柱状图", "饼图", "热力图", "折线图"]
-                )
-                
-                if viz_type == "表格":
-                    st.dataframe(df, use_container_width=True)
-                
-                elif viz_type == "雷达图":
-                    # Select indicators
-                    selected_indicators = st.multiselect(
-                        "选择要显示的指标",
-                        df['指标名称'].tolist(),
-                        default=df['指标名称'].tolist()[:5]
-                    )
-                    
-                    if selected_indicators:
-                        plot_df = df[df['指标名称'].isin(selected_indicators)]
-                        fig = px.line_polar(
-                            plot_df,
-                            r='得分',
-                            theta='指标名称',
-                            line_close=True,
-                            title="指标得分雷达图"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "柱状图":
-                    # Select indicators
-                    selected_indicators = st.multiselect(
-                        "选择要显示的指标",
-                        df['指标名称'].tolist(),
-                        default=df['指标名称'].tolist()[:5]
-                    )
-                    
-                    if selected_indicators:
-                        plot_df = df[df['指标名称'].isin(selected_indicators)]
-                        fig = px.bar(
-                            plot_df,
-                            x='指标名称',
-                            y='得分',
-                            color='状态',
-                            title="指标得分柱状图"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "饼图":
-                    # Status distribution
-                    status_counts = df['状态'].value_counts()
-                    fig = px.pie(
-                        values=status_counts.values,
-                        names=status_counts.index,
-                        title="指标状态分布",
-                        color=status_counts.index,
-                        color_discrete_map={
-                            "优秀": "#00FF00",
-                            "良好": "#90EE90",
-                            "及格": "#FFD700",
-                            "未达标": "#FF0000",
-                            "未知": "#808080"
-                        }
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "热力图":
-                    # Create correlation matrix
-                    numeric_cols = df.select_dtypes(include=[np.number]).columns
-                    corr_matrix = df[numeric_cols].corr()
-                    
-                    fig = go.Figure(data=go.Heatmap(
-                        z=corr_matrix,
-                        x=corr_matrix.columns,
-                        y=corr_matrix.columns,
-                        colorscale='RdBu'
-                    ))
-                    fig.update_layout(title="指标相关性热力图")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "折线图":
-                    # Sort by score
-                    plot_df = df.sort_values('得分')
-                    fig = px.line(
-                        plot_df,
-                        x=plot_df.index,
-                        y='得分',
-                        markers=True,
-                        title="指标得分趋势"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+    if selected_file:
+        try:
+            # Load Excel file
+            df = pd.read_excel(UPLOAD_DIR / selected_file)
             
-            except Exception as e:
-                st.error(f"处理数据时出错: {str(e)}")
-    
-    else:  # Multi-file comparison
-        # Multiple file selection
-        selected_files = st.multiselect(
-            "选择要对比的文件",
-            [f.name for f in existing_files],
-            default=[f.name for f in existing_files[:2]]
-        )
-        
-        if len(selected_files) >= 2:
-            try:
-                # Load data for all selected files
-                dfs = []
-                for file in selected_files:
-                    df = load_scheme_data(UPLOAD_DIR / file)
-                    df['方案'] = file
-                    dfs.append(df)
-                
-                # Combine all data
-                combined_df = pd.concat(dfs)
-                
-                # Visualization type selection
-                viz_type = st.selectbox(
-                    "选择可视化类型",
-                    ["表格", "雷达图", "柱状图", "饼图", "热力图", "折线图"],
-                    key="multi_viz"
-                )
-                
-                if viz_type == "表格":
-                    st.dataframe(combined_df, use_container_width=True)
-                
-                elif viz_type == "雷达图":
-                    # Select indicators
-                    selected_indicators = st.multiselect(
-                        "选择要显示的指标",
-                        combined_df['指标名称'].unique(),
-                        default=combined_df['指标名称'].unique()[:5]
-                    )
-                    
-                    if selected_indicators:
-                        plot_df = combined_df[combined_df['指标名称'].isin(selected_indicators)]
-                        fig = px.line_polar(
-                            plot_df,
-                            r='得分',
-                            theta='指标名称',
-                            color='方案',
-                            line_close=True,
-                            title="多方案指标得分雷达图"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "柱状图":
-                    # Select indicators
-                    selected_indicators = st.multiselect(
-                        "选择要显示的指标",
-                        combined_df['指标名称'].unique(),
-                        default=combined_df['指标名称'].unique()[:5]
-                    )
-                    
-                    if selected_indicators:
-                        plot_df = combined_df[combined_df['指标名称'].isin(selected_indicators)]
-                        fig = px.bar(
-                            plot_df,
-                            x='指标名称',
-                            y='得分',
-                            color='方案',
-                            barmode='group',
-                            title="多方案指标得分对比"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "饼图":
-                    # Status distribution by scheme
-                    status_counts = pd.crosstab(
-                        combined_df['方案'],
-                        combined_df['状态']
-                    )
-                    fig = px.pie(
-                        values=status_counts.values.flatten(),
-                        names=status_counts.columns.repeat(len(status_counts)),
-                        color=status_counts.columns.repeat(len(status_counts)),
-                        title="多方案指标状态分布",
-                        facet_col=status_counts.index
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "热力图":
-                    # Create correlation matrix for each scheme
-                    for scheme in selected_files:
-                        scheme_df = combined_df[combined_df['方案'] == scheme]
-                        numeric_cols = scheme_df.select_dtypes(include=[np.number]).columns
-                        corr_matrix = scheme_df[numeric_cols].corr()
-                        
-                        fig = go.Figure(data=go.Heatmap(
-                            z=corr_matrix,
-                            x=corr_matrix.columns,
-                            y=corr_matrix.columns,
-                            colorscale='RdBu'
-                        ))
-                        fig.update_layout(title=f"{scheme} - 指标相关性热力图")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                elif viz_type == "折线图":
-                    # Score trends by scheme
-                    for scheme in selected_files:
-                        scheme_df = combined_df[combined_df['方案'] == scheme].sort_values('得分')
-                        fig = px.line(
-                            scheme_df,
-                            x=scheme_df.index,
-                            y='得分',
-                            markers=True,
-                            title=f"{scheme} - 指标得分趋势"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+            # Load data features
+            features = load_data_features(selected_file)
             
-            except Exception as e:
-                st.error(f"处理数据时出错: {str(e)}")
-        else:
-            st.warning("请至少选择两个文件进行对比分析") 
+            if features:
+                # Create visualizations
+                visualizations = create_advanced_visualizations(df, features)
+                
+                # Display visualizations
+                st.header("高级可视化分析结果")
+                
+                # Create tabs for different visualization types
+                tab1, tab2, tab3, tab4 = st.tabs(["PCA分析", "相关性网络", "散点矩阵", "平行坐标"])
+                
+                with tab1:
+                    if "pca_2d" in visualizations:
+                        st.plotly_chart(visualizations["pca_2d"], use_container_width=True)
+                    if "pca_3d" in visualizations:
+                        st.plotly_chart(visualizations["pca_3d"], use_container_width=True)
+                    if "pca_variance" in visualizations:
+                        st.plotly_chart(visualizations["pca_variance"], use_container_width=True)
+                
+                with tab2:
+                    if "correlation_network" in visualizations:
+                        st.plotly_chart(visualizations["correlation_network"], use_container_width=True)
+                
+                with tab3:
+                    if "scatter_matrix" in visualizations:
+                        st.plotly_chart(visualizations["scatter_matrix"], use_container_width=True)
+                
+                with tab4:
+                    if "parallel_coordinates" in visualizations:
+                        st.plotly_chart(visualizations["parallel_coordinates"], use_container_width=True)
+            
+            else:
+                st.warning("未找到数据特征信息，请先在数据配置页面分析数据")
+            
+        except Exception as e:
+            st.error(f"处理数据时出错: {str(e)}") 

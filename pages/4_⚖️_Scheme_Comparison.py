@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
+import json
 import numpy as np
 
 # Page config
@@ -14,66 +16,125 @@ st.set_page_config(
 # Title
 st.title("⚖️ 方案对比分析")
 
-# Helper functions
-def load_scheme_data(file_path):
-    """Load and process scheme data"""
-    df = pd.read_excel(file_path)
-    df['得分'] = df.apply(
-        lambda row: calculate_score(
-            row['指标值'],
-            row['权重'],
-            row['评分标准_及格线'],
-            row['评分标准_优秀线']
-        ),
-        axis=1
-    )
-    df['状态'] = df['得分'].apply(get_status)
-    return df
-
-def calculate_score(value, weight, pass_threshold, excellent_threshold):
-    """Calculate score based on value and thresholds"""
-    if pd.isna(value) or pd.isna(pass_threshold) or pd.isna(excellent_threshold):
-        return None
+def load_data_features(file_name):
+    """Load data features from JSON file"""
+    # Remove .xlsx extension if present
+    file_stem = Path(file_name).stem
     
+    # Check if this is a cleaned file
+    if "_cleaned_" in file_stem:
+        # Extract original file name
+        original_name = file_stem.split("_cleaned_")[0]
+        features_file = Path(__file__).parent.parent / "data" / "features" / f"{original_name}.json"
+    else:
+        features_file = Path(__file__).parent.parent / "data" / "features" / f"{file_stem}.json"
+    
+    if features_file.exists():
+        with open(features_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    st.error(f"无法加载特征配置文件: {features_file.name}")
+    return None
+
+def load_excel_file(file_path):
+    """Load Excel file with proper data type conversion"""
     try:
-        value = float(value)
-        if value >= excellent_threshold:
-            return 100
-        elif value >= pass_threshold:
-            return 60 + (value - pass_threshold) * 40 / (excellent_threshold - pass_threshold)
-        else:
-            return 60 * value / pass_threshold
-    except:
+        df = pd.read_excel(file_path)
+        return df
+    except Exception as e:
+        st.error(f"加载文件时出错: {str(e)}")
         return None
 
-def get_status(score):
-    """Get status based on score"""
-    if pd.isna(score):
-        return "未知"
-    elif score >= 90:
-        return "优秀"
-    elif score >= 75:
-        return "良好"
-    elif score >= 60:
-        return "及格"
-    else:
-        return "未达标"
+def compare_schemes(df1, df2, features1, features2):
+    """Compare two schemes and return comparison results"""
+    comparison = {
+        "numeric_comparison": {},
+        "categorical_comparison": {},
+        "correlation_comparison": {}
+    }
+    
+    # Get common numeric columns
+    common_numeric_cols = set.intersection(
+        set(features1["numeric_columns"]),
+        set(features2["numeric_columns"])
+    )
+    
+    # Get common categorical columns
+    common_categorical_cols = set.intersection(
+        set(features1["categorical_columns"]),
+        set(features2["categorical_columns"])
+    )
+    
+    # Numeric comparison
+    for col in common_numeric_cols:
+        comparison["numeric_comparison"][col] = {
+            "scheme1": {
+                "mean": df1[col].mean(),
+                "std": df1[col].std(),
+                "min": df1[col].min(),
+                "max": df1[col].max(),
+                "median": df1[col].median()
+            },
+            "scheme2": {
+                "mean": df2[col].mean(),
+                "std": df2[col].std(),
+                "min": df2[col].min(),
+                "max": df2[col].max(),
+                "median": df2[col].median()
+            },
+            "difference": {
+                "mean_diff": df2[col].mean() - df1[col].mean(),
+                "std_diff": df2[col].std() - df1[col].std(),
+                "min_diff": df2[col].min() - df1[col].min(),
+                "max_diff": df2[col].max() - df1[col].max(),
+                "median_diff": df2[col].median() - df1[col].median()
+            }
+        }
+    
+    # Categorical comparison
+    for col in common_categorical_cols:
+        comparison["categorical_comparison"][col] = {
+            "scheme1": df1[col].value_counts().to_dict(),
+            "scheme2": df2[col].value_counts().to_dict()
+        }
+    
+    # Correlation comparison
+    numeric_cols1 = features1["numeric_columns"]
+    numeric_cols2 = features2["numeric_columns"]
+    
+    if numeric_cols1 and numeric_cols2:
+        corr1 = df1[numeric_cols1].corr()
+        corr2 = df2[numeric_cols2].corr()
+        
+        # Get common columns for correlation comparison
+        common_cols = list(set(numeric_cols1) & set(numeric_cols2))
+        if common_cols:
+            corr1 = corr1.loc[common_cols, common_cols]
+            corr2 = corr2.loc[common_cols, common_cols]
+            comparison["correlation_comparison"] = {
+                "corr1": corr1.to_dict(),
+                "corr2": corr2.to_dict(),
+                "corr_diff": (corr2 - corr1).to_dict()
+            }
+    
+    return comparison
 
-# Get list of files
+# Get uploaded files
 UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_excel"
 existing_files = list(UPLOAD_DIR.glob("*.xlsx")) + list(UPLOAD_DIR.glob("*.xls"))
 
 if not existing_files:
-    st.warning("请先在数据配置页面上传评估数据文件")
+    st.warning("请先在数据配置页面上传文件")
 else:
     # File selection
     col1, col2 = st.columns(2)
+    
     with col1:
         scheme1 = st.selectbox(
             "选择方案A",
             [f.name for f in existing_files],
             key="scheme1"
         )
+    
     with col2:
         scheme2 = st.selectbox(
             "选择方案B",
@@ -82,133 +143,184 @@ else:
         )
     
     if scheme1 and scheme2:
-        try:
-            # Load data
-            df1 = load_scheme_data(UPLOAD_DIR / scheme1)
-            df2 = load_scheme_data(UPLOAD_DIR / scheme2)
+        # Load files and features
+        df1 = load_excel_file(UPLOAD_DIR / scheme1)
+        df2 = load_excel_file(UPLOAD_DIR / scheme2)
+        
+        if df1 is not None and df2 is not None:
+            features1 = load_data_features(scheme1)
+            features2 = load_data_features(scheme2)
             
-            # Calculate total scores
-            total_score1 = np.average(
-                df1['得分'].dropna(),
-                weights=df1.loc[df1['得分'].notna(), '权重']
-            )
-            total_score2 = np.average(
-                df2['得分'].dropna(),
-                weights=df2.loc[df2['得分'].notna(), '权重']
-            )
-            
-            # Summary metrics
-            st.header("方案对比摘要")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    f"{scheme1} 总分",
-                    f"{total_score1:.1f}",
-                    f"{total_score1 - total_score2:.1f}"
-                )
-            with col2:
-                st.metric(
-                    f"{scheme2} 总分",
-                    f"{total_score2:.1f}",
-                    f"{total_score2 - total_score1:.1f}"
-                )
-            with col3:
-                st.metric(
-                    "总分差异",
-                    f"{abs(total_score1 - total_score2):.1f}",
-                    "↑" if total_score1 > total_score2 else "↓"
-                )
-            
-            # Merge data for comparison
-            df1['方案'] = scheme1
-            df2['方案'] = scheme2
-            merged_df = pd.concat([df1, df2])
-            
-            # Status comparison
-            st.header("指标状态对比")
-            status_counts = pd.crosstab(
-                merged_df['方案'],
-                merged_df['状态']
-            )
-            fig_status = px.bar(
-                status_counts,
-                title="方案指标状态分布对比",
-                barmode="group"
-            )
-            st.plotly_chart(fig_status, use_container_width=True)
-            
-            # Detailed comparison
-            st.header("详细指标对比")
-            
-            # Create comparison dataframe
-            comparison_data = []
-            all_indicators = set(df1['指标名称'].unique()) | set(df2['指标名称'].unique())
-            
-            for indicator in all_indicators:
-                row1 = df1[df1['指标名称'] == indicator].iloc[0] if indicator in df1['指标名称'].values else None
-                row2 = df2[df2['指标名称'] == indicator].iloc[0] if indicator in df2['指标名称'].values else None
+            if features1 and features2:
+                # Compare schemes
+                comparison = compare_schemes(df1, df2, features1, features2)
                 
-                comparison_data.append({
-                    '指标名称': indicator,
-                    f'{scheme1}_指标值': row1['指标值'] if row1 is not None else None,
-                    f'{scheme1}_得分': row1['得分'] if row1 is not None else None,
-                    f'{scheme1}_状态': row1['状态'] if row1 is not None else None,
-                    f'{scheme2}_指标值': row2['指标值'] if row2 is not None else None,
-                    f'{scheme2}_得分': row2['得分'] if row2 is not None else None,
-                    f'{scheme2}_状态': row2['状态'] if row2 is not None else None,
-                    '得分差异': (row1['得分'] if row1 is not None else 0) - (row2['得分'] if row2 is not None else 0)
-                })
-            
-            comparison_df = pd.DataFrame(comparison_data)
-            
-            # Display comparison table
-            st.dataframe(comparison_df, use_container_width=True)
-            
-            # Score comparison visualization
-            st.header("得分对比可视化")
-            
-            # Select indicators to compare
-            selected_indicators = st.multiselect(
-                "选择要对比的指标",
-                comparison_df['指标名称'].tolist(),
-                default=comparison_df['指标名称'].tolist()[:5]
-            )
-            
-            if selected_indicators:
-                # Filter data for selected indicators
-                plot_df = comparison_df[comparison_df['指标名称'].isin(selected_indicators)]
+                # Create tabs for different comparison types
+                tab1, tab2, tab3 = st.tabs(["数值对比", "类别对比", "相关性对比"])
                 
-                # Create comparison bar chart
-                fig_comparison = px.bar(
-                    plot_df,
-                    x='指标名称',
-                    y=[f'{scheme1}_得分', f'{scheme2}_得分'],
-                    title="指标得分对比",
-                    barmode="group"
-                )
-                st.plotly_chart(fig_comparison, use_container_width=True)
+                with tab1:
+                    st.header("数值指标对比")
+                    
+                    if comparison["numeric_comparison"]:
+                        # Select metrics to compare
+                        selected_metrics = st.multiselect(
+                            "选择要对比的指标",
+                            list(comparison["numeric_comparison"].keys()),
+                            default=list(comparison["numeric_comparison"].keys())[:3] if len(comparison["numeric_comparison"]) >= 3 else list(comparison["numeric_comparison"].keys())
+                        )
+                        
+                        if selected_metrics:
+                            # Create comparison plot
+                            fig = go.Figure()
+                            
+                            for metric in selected_metrics:
+                                comp = comparison["numeric_comparison"][metric]
+                                
+                                # Add bars for scheme1
+                                fig.add_trace(go.Bar(
+                                    name=f"{Path(scheme1).stem} - {metric}",
+                                    x=[metric],
+                                    y=[comp["scheme1"]["mean"]],
+                                    error_y=dict(
+                                        type='data',
+                                        array=[comp["scheme1"]["std"]],
+                                        visible=True
+                                    )
+                                ))
+                                
+                                # Add bars for scheme2
+                                fig.add_trace(go.Bar(
+                                    name=f"{Path(scheme2).stem} - {metric}",
+                                    x=[metric],
+                                    y=[comp["scheme2"]["mean"]],
+                                    error_y=dict(
+                                        type='data',
+                                        array=[comp["scheme2"]["std"]],
+                                        visible=True
+                                    )
+                                ))
+                            
+                            fig.update_layout(
+                                title="指标均值对比",
+                                barmode='group',
+                                showlegend=True
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Display detailed comparison
+                            st.subheader("详细对比")
+                            comparison_data = []
+                            
+                            for metric in selected_metrics:
+                                comp = comparison["numeric_comparison"][metric]
+                                comparison_data.append({
+                                    "指标": metric,
+                                    f"{Path(scheme1).stem}均值": f"{comp['scheme1']['mean']:.2f}",
+                                    f"{Path(scheme1).stem}标准差": f"{comp['scheme1']['std']:.2f}",
+                                    f"{Path(scheme2).stem}均值": f"{comp['scheme2']['mean']:.2f}",
+                                    f"{Path(scheme2).stem}标准差": f"{comp['scheme2']['std']:.2f}",
+                                    "均值差异": f"{comp['difference']['mean_diff']:.2f}",
+                                    "标准差差异": f"{comp['difference']['std_diff']:.2f}"
+                                })
+                            
+                            st.dataframe(pd.DataFrame(comparison_data), use_container_width=True)
+                    else:
+                        st.warning("未找到可对比的数值型指标")
                 
-                # Create radar chart
-                radar_data = []
-                for indicator in selected_indicators:
-                    row = comparison_df[comparison_df['指标名称'] == indicator].iloc[0]
-                    radar_data.extend([
-                        {'指标': indicator, '方案': scheme1, '得分': row[f'{scheme1}_得分']},
-                        {'指标': indicator, '方案': scheme2, '得分': row[f'{scheme2}_得分']}
-                    ])
+                with tab2:
+                    st.header("类别指标对比")
+                    
+                    if comparison["categorical_comparison"]:
+                        # Select categorical columns to compare
+                        selected_cats = st.multiselect(
+                            "选择要对比的类别指标",
+                            list(comparison["categorical_comparison"].keys()),
+                            default=list(comparison["categorical_comparison"].keys())[:2] if len(comparison["categorical_comparison"]) >= 2 else list(comparison["categorical_comparison"].keys())
+                        )
+                        
+                        if selected_cats:
+                            for cat in selected_cats:
+                                st.subheader(f"{cat} 分布对比")
+                                
+                                # Create comparison plot
+                                fig = go.Figure()
+                                
+                                # Get all unique categories
+                                all_cats = set(comparison["categorical_comparison"][cat]["scheme1"].keys()) | set(comparison["categorical_comparison"][cat]["scheme2"].keys())
+                                
+                                # Add bars for scheme1
+                                fig.add_trace(go.Bar(
+                                    name=Path(scheme1).stem,
+                                    x=list(all_cats),
+                                    y=[comparison["categorical_comparison"][cat]["scheme1"].get(c, 0) for c in all_cats]
+                                ))
+                                
+                                # Add bars for scheme2
+                                fig.add_trace(go.Bar(
+                                    name=Path(scheme2).stem,
+                                    x=list(all_cats),
+                                    y=[comparison["categorical_comparison"][cat]["scheme2"].get(c, 0) for c in all_cats]
+                                ))
+                                
+                                fig.update_layout(
+                                    title=f"{cat} 分布对比",
+                                    barmode='group',
+                                    showlegend=True
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Display detailed comparison
+                                st.subheader("详细对比")
+                                comparison_data = []
+                                
+                                for cat_value in all_cats:
+                                    count1 = comparison["categorical_comparison"][cat]["scheme1"].get(cat_value, 0)
+                                    count2 = comparison["categorical_comparison"][cat]["scheme2"].get(cat_value, 0)
+                                    comparison_data.append({
+                                        "类别": cat_value,
+                                        f"{Path(scheme1).stem}数量": count1,
+                                        f"{Path(scheme2).stem}数量": count2,
+                                        "数量差异": count2 - count1
+                                    })
+                                
+                                st.dataframe(pd.DataFrame(comparison_data), use_container_width=True)
+                    else:
+                        st.warning("未找到可对比的类别型指标")
                 
-                radar_df = pd.DataFrame(radar_data)
-                fig_radar = px.line_polar(
-                    radar_df,
-                    r='得分',
-                    theta='指标',
-                    color='方案',
-                    line_close=True,
-                    title="指标雷达图对比"
-                )
-                st.plotly_chart(fig_radar, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"处理数据时出错: {str(e)}")
-            st.error("请确保数据文件包含所需的列：指标名称、指标值、权重、评分标准_及格线、评分标准_优秀线、单位") 
+                with tab3:
+                    st.header("相关性对比")
+                    
+                    if comparison["correlation_comparison"]:
+                        # Select metrics for correlation comparison
+                        corr1 = pd.DataFrame(comparison["correlation_comparison"]["corr1"])
+                        corr2 = pd.DataFrame(comparison["correlation_comparison"]["corr2"])
+                        corr_diff = pd.DataFrame(comparison["correlation_comparison"]["corr_diff"])
+                        
+                        # Create heatmap for correlation difference
+                        fig = go.Figure(data=go.Heatmap(
+                            z=corr_diff.values,
+                            x=corr_diff.columns,
+                            y=corr_diff.index,
+                            colorscale='RdBu',
+                            zmid=0
+                        ))
+                        
+                        fig.update_layout(
+                            title="相关性差异热力图",
+                            xaxis_title="指标",
+                            yaxis_title="指标"
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Display detailed correlation comparison
+                        st.subheader("详细相关性对比")
+                        st.dataframe(corr_diff, use_container_width=True)
+                    else:
+                        st.warning("未找到可对比的相关性数据")
+            else:
+                st.error("无法加载数据特征配置，请确保特征配置文件存在且格式正确")
+        else:
+            st.error("无法加载文件，请确保文件存在且格式正确") 
