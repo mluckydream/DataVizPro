@@ -1,0 +1,124 @@
+/* Main theme colors */
+:root {
+    --primary-bg: #0A192F;
+    --secondary-bg: #172A45;
+    --text-color: #CCD6F6;
+    --accent-color: #64FFDA;
+    --border-color: #233554;
+}
+
+/* Global styles */
+.stApp {
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+}
+
+/* Metric cards */
+.stMetric {
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stMetric:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+/* Dataframe styling */
+.dataframe {
+    background-color: var(--secondary-bg) !important;
+    color: var(--text-color) !important;
+}
+
+.dataframe th {
+    background-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+    font-weight: 600 !important;
+}
+
+.dataframe td {
+    color: var(--text-color) !important;
+}
+
+/* Input widgets */
+.stSelectbox, .stTextInput, .stNumberInput {
+    background-color: var(--secondary-bg) !important;
+    color: var(--text-color) !important;
+}
+
+/* Buttons */
+.stButton button {
+    background-color: var(--accent-color) !important;
+    color: var(--primary-bg) !important;
+    border: none !important;
+    border-radius: 4px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 600 !important;
+}
+
+.stButton button:hover {
+    opacity: 0.9 !important;
+    transform: translateY(-1px) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Sidebar */
+.sidebar .sidebar-content {
+    background-color: var(--secondary-bg) !important;
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-color) !important;
+    font-weight: 600 !important;
+}
+
+/* Links */
+a {
+    color: var(--accent-color) !important;
+    text-decoration: none !important;
+}
+
+a:hover {
+    text-decoration: underline !important;
+}
+
+/* File uploader */
+.stFileUploader {
+    background-color: var(--secondary-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+}
+
+/* Radio buttons and checkboxes */
+.stRadio > div {
+    background-color: var(--secondary-bg) !important;
+    color: var(--text-color) !important;
+}
+
+/* Plotly charts */
+.js-plotly-plot {
+    background-color: var(--secondary-bg) !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--primary-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color);
+} 
